@@ -5,6 +5,7 @@
 #include "osrf_gear/Product.h"
 #include "osrf_gear/StorageUnit.h"
 #include "osrf_gear/GetMaterialLocations.h"
+#include "osrf_gear/LogicalCameraImage.h"
 #include "ros/ros.h"
 std_srvs::Trigger begin_comp;
 int service_call_succeeded;
@@ -13,8 +14,21 @@ osrf_gear::Order first_order;
 osrf_gear::Shipment first_shipment;
 osrf_gear::Product first_product;
 std::vector<osrf_gear::Order> order_vector;
+std::vector<osrf_gear::LogicalCameraImage> logic_bin_vector;
+std::vector<osrf_gear::LogicalCameraImage> logic_agv_vector;
+std::vector<osrf_gear::LogicalCameraImage> logic_quality_vector;
+
 void chatterCallback(const osrf_gear::Order::ConstPtr& orders){
   order_vector.push_back(*orders);
+}
+void logicbinCameraCallback(const osrf_gear::LogicalCameraImage::ConstPtr& bin_msg){
+  logic_bin_vector.push_back(*bin_msg);
+}
+void logicagvCameraCallback(const osrf_gear::LogicalCameraImage::ConstPtr& agv_msg){
+  logic_agv_vector.push_back(*agv_msg);
+}
+void logicQualityCameraCallback(const osrf_gear::LogicalCameraImage::ConstPtr& qual_msg){
+  logic_quality_vector.push_back(*qual_msg);
 }
 int main(int argc, char **argv)
   {
@@ -22,10 +36,24 @@ int main(int argc, char **argv)
   
   ros::NodeHandle n;
   
-  
-  ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
   order_vector.clear();
+  logic_bin_vector.clear();
+  logic_agv_vector.clear();
+  logic_quality_vector.clear();
+  ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
+  
   ros::Subscriber sub = n.subscribe("/ariac/orders", 1000, chatterCallback);
+
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_agv1", 1000, logicagvCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_agv2", 1000, logicagvCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin1", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin2", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin3", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin4", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin5", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/logical_camera_bin6", 1000, logicbinCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/quality_control_sensor_1", 1000, logicQualityCameraCallback);
+  ros::Subscriber sub = n.subscribe("/ariac/quality_control_sensor_1", 1000, logicQualityCameraCallback);
   
   ros::ServiceClient request_bin = n.serviceClient<osrf_gear::GetMaterialLocations>("/ariac/material_locations");
   service_call_succeeded = begin_client.call(begin_comp);
