@@ -65,10 +65,12 @@ The first bin pushes to the zeroeth index.
 `logicalCameraBinVectorCallback(bin_msg, 0)`
 The outer vector receives it
 `void logicalCameraBinVectorCallback(const osrf_gear::LogicalCameraImage::ConstPtr& msg, int cam_num){logic_camera_bin_vector[cam_num] = *msg;}`.
+
 > In our code, once the GetMaterialsLocation service returns a location, we choose the index of the vector that matches that location.
 We have three vectors, one for bins, one for agvs, and one for quality.
 In this simulation, it retruns bin4.
 We then search the logical camera image for bin4, in `logic_camera_bin_vector[3]`
+
 >Each logicalCameraImage holds a vector of Models.
 Each Model has a type, product types to be specific, and a pose.
 We search the vector for the first model that has the same product type as the first product and return its pose.
