@@ -1,0 +1,5 @@
+<launch>
+  <arg name="use_sample_environment" default="false" />
+  <include if="$(arg use_sample_environment)" file="$(find osrf_gear)/launch/sample_environment.launch" />
+  <include unless="$(arg use_sample_environment)" file="$(find ecse_373_ariac)/launch/ecse_373_ariac.launch" />
+</launch>

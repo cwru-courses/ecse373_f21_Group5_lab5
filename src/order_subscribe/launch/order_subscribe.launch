@@ -1,0 +1,3 @@
+<launch>
+  <node name="order_subscribe_node" pkg="order_subscribe" type="trigger_subscriber_node" output="screen" />
+</launch>

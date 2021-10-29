@@ -154,8 +154,8 @@ int main(int argc, char **argv)
         }
         for(int i = 0; first_image.models.size(); i++){
 	  if(!strcmp(first_image.models[i].type.c_str(), first_product.type.c_str())){
-	    ROS_INFO("The pose of the first product type %s in %s is:", first_image.models[i].type.c_str(), find_bins.response.storage_units.front().unit_id.c_str());
-	    ROS_WARN_STREAM(first_image.models[i].pose);
+	    ROS_INFO_ONCE("The pose of the first product type %s in %s is:", first_image.models[i].type.c_str(), find_bins.response.storage_units.front().unit_id.c_str());
+	    ROS_WARN_STREAM_ONCE(first_image.models[i].pose);
 	    break;
 	  }
         }
