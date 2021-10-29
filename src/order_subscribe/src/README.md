@@ -1,6 +1,6 @@
 # Order Subscriber + First Product Found
 
-##ariac 2019
+## ariac 2019
 > The code and environments specified in this lab draw heavily from structures provided by the ariac 2019 competition.
 Visit [Ariac 2019 Wiki](https://bitbucket.org/osrf/ariac/wiki/2019/documentation) to read these specs.
 ## launch files
@@ -54,8 +54,8 @@ It works similarly to Trigger, expect the topic we service is /ariac/material_lo
 Also, the service requires request info, the type of the product it is searching for. 
 This can be accomplished with `<service_name>.request.material_type = <product_name>.type`
 
-###Retrieving the pose of the first product
- > The locations of the products are found using the 10 logical cameras.
+### Retrieving the pose of the first product
+> The locations of the products are found using the 10 logical cameras.
 One for each of the six bins, two for the agvs, and two for quality.
 We subscribe to all ten individually using the rostopics listed when running the simulation environment.
 This is actually done using nested callbacks. 
