@@ -159,6 +159,7 @@ add_executable(trigger_subscriber_node src/comp_start.cpp)
 ## Specify libraries to link a library or executable target against
   target_link_libraries(trigger_subscriber_node
     ${catkin_LIBRARIES}
+    ur10_kin
   )
 
 #############
