@@ -225,7 +225,7 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       int q_sols_indx = 0;
  
   joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
-      joint_trajectory.points[1].positions[0] =   joint_states.position[1];
+      joint_trajectory.points[1].positions[0] =   joint_states.position[0];
 
       for (int indy = 0; indy< 6; indy++){
         joint_trajectory.points[1].positions[indy + 1] = q_sols[q_sols_indx][indy];
