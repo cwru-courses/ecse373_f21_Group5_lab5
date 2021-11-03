@@ -182,16 +182,16 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       double q_pose[6], q_sols[8][6];
       int count = 0;
   //joint_states.position[0] is the linear_arm_actuator, not used in inverse calculation
-      q_pose[0] = joint_states.position[1];
-      q_pose[1] = joint_states.position[2];
-      q_pose[2] = joint_states.position[3];
+      q_pose[0] = joint_states.position[2];
+      q_pose[1] = joint_states.position[3];
+      q_pose[2] = joint_states.position[0];
       q_pose[3] = joint_states.position[4];
       q_pose[4] = joint_states.position[5];
       q_pose[5] = joint_states.position[6];
 
       ur_kinematics::forward((double *)&q_pose, (double *)&T_pose);
 
-      int num_sols = ur_kinematics::inverse((double *)&T_des, (double *)&q_sols);
+      int num_sols = ur_kinematics::inverse((double *)&T_des, (double *)&q_sols, 0.0);
   
       trajectory_msgs::JointTrajectory joint_trajectory;
 
@@ -200,8 +200,7 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       joint_trajectory.header.frame_id = "/base_link";
 
       joint_trajectory.joint_names.clear();
-
-           joint_trajectory.joint_names.push_back("linear_arm_actuator_joint");
+ joint_trajectory.joint_names.push_back("linear_arm_actuator_joint");
       joint_trajectory.joint_names.push_back("shoulder_pan_joint");
       joint_trajectory.joint_names.push_back("shoulder_lift_joint");
       joint_trajectory.joint_names.push_back("elbow_joint");
@@ -225,7 +224,7 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       int q_sols_indx = 0;
  
   joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
-      joint_trajectory.points[1].positions[0] =   joint_states.position[0];
+      joint_trajectory.points[1].positions[0] =   joint_states.position[1];
 
       for (int indy = 0; indy< 6; indy++){
         joint_trajectory.points[1].positions[indy + 1] = q_sols[q_sols_indx][indy];
