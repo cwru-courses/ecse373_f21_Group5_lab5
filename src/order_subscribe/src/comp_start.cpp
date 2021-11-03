@@ -215,7 +215,7 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       for(int indy = 0; indy < joint_trajectory.joint_names.size(); indy++){
         for(int indz = 0; indz < joint_states.name.size(); indz++) {
           if(joint_trajectory.joint_names[indy] == joint_states.name[indz]) {
-            joint_trajectory.joint_names[indy] = joint_states.position[indz];
+            joint_trajectory.points[0].positions[indy] = joint_states.position[indz];
             break;
           }
         }
@@ -230,13 +230,11 @@ if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       for (int indy = 0; indy< 6; indy++){
         joint_trajectory.points[1].positions[indy + 1] = q_sols[q_sols_indx][indy];
       }
-      arm_command_pub.publish(joint_trajectory); 
-
       joint_trajectory.points[1].time_from_start =   ros::Duration(1.0);
-    
+      arm_command_pub.publish(joint_trajectory);
     }
     }
-  ros::Duration(1.0).sleep();
+    ros::Duration(2.0).sleep();
   }
   ros::waitForShutdown();
   return 0;
