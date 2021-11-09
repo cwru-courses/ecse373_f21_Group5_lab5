@@ -11,9 +11,14 @@
 #include "ros/ros.h"
 #include "sensor_msgs/JointState.h"
 #include "trajectory_msgs/JointTrajectory.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "geometry_msgs/TransformStamped.h"
+int failedtf = 0;
 sensor_msgs::JointState joint_states;
 std_srvs::Trigger begin_comp;
 int service_call_succeeded;
+tf2_ros::Buffer tfBuffer;
 osrf_gear::LogicalCameraImage first_image;
 osrf_gear::GetMaterialLocations find_bins;
 osrf_gear::Order first_order;
@@ -75,7 +80,6 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "trigger_subscriber_node");
   
   ros::NodeHandle n;
-  
   order_vector.clear();
   logic_camera_bin_vector.clear();
   logic_camera_bin_vector.resize(6);
@@ -83,7 +87,7 @@ int main(int argc, char **argv)
   logic_agv_vector.resize(2);
   logic_quality_vector.clear();
   logic_quality_vector.resize(2);
-
+  tf2_ros::TransformListener tfListener(tfBuffer);
   ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
 
   ros::Publisher arm_command_pub = n.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
@@ -102,7 +106,9 @@ int main(int argc, char **argv)
   ros::Subscriber logical_camera_subscriber_quality_control_sensor2 = n.subscribe("/ariac/quality_control_sensor_2", 10, logicQuality2CameraCallback);
   ros::Subscriber joint_states_h = n.subscribe("ariac/arm1/joint_states", 10, jointCB);
 
-
+  while(ros::ok() && !tfBuffer.canTransform("arm1_base_link", "logical_camera_bin4_frame", ros::Time(0,0), ros::Duration(4.0))){
+  failedtf++;
+}
   ros::ServiceClient request_bin = n.serviceClient<osrf_gear::GetMaterialLocations>("/ariac/material_locations");
   service_call_succeeded = begin_client.call(begin_comp);
 	if (service_call_succeeded == 0){
@@ -124,6 +130,7 @@ int main(int argc, char **argv)
   spinner.start();
   while(ros::ok()){
     if(order_vector.size() > 0){
+      geometry_msgs::TransformStamped tfStamped;
       first_order = order_vector.front();
       first_shipment = first_order.shipments.front();
       first_product = first_shipment.products.front();
@@ -136,33 +143,103 @@ int main(int argc, char **argv)
         ROS_INFO("product type: %s is in  %s", first_product.type.c_str(), find_bins.response.storage_units.front().unit_id.c_str());
 	if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin1")){
  	  first_image = logic_camera_bin_vector[0];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin1_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin2")){
 	  first_image = logic_camera_bin_vector[1];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin2_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin3")){
 	  first_image = logic_camera_bin_vector[2];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin3_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin4")){
 	  first_image = logic_camera_bin_vector[3];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin4_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin5")){
 	  first_image = logic_camera_bin_vector[4];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin5_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin6")){
 	  first_image = logic_camera_bin_vector[5];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_bin6_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv1")){
 	  first_image = logic_agv_vector[0];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_agv1_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv2")){
 	  first_image = logic_agv_vector[1];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_agv2_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "quality_control_sensor_1")){
 	  first_image = logic_agv_vector[0];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "quality_control_sensor_2")){
 	  first_image = logic_agv_vector[1];
+	  try{
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", "logical_camera_frame", ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	     }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
         }
         for(int i = 0; first_image.models.size(); i++){
 	  if(!strcmp(first_image.models[i].type.c_str(), first_product.type.c_str())){
@@ -175,9 +252,12 @@ int main(int argc, char **argv)
       }
 if(!strcmp(first_model.type.c_str(), first_product.type.c_str()) ){
       double T_pose[4][4];
-      double T_des[4][4] = {{0.0, -1.0, 0.0, first_model.pose.position.x}, \
-      {0.0, 0.0, 1.0, first_model.pose.position.y}, \
-      {-1.0, 0.0, 0.0, first_model.pose.position.z + 0.3}, \
+      geometry_msgs::PoseStamped part_pose, goal_pose;
+      part_pose.pose = first_model.pose;
+      tf2::doTransform(part_pose, goal_pose, tfStamped);
+      double T_des[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x}, \
+      {0.0, 0.0, 1.0, goal_pose.pose.position.y}, \
+      {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.3}, \
       {0.0, 0.0, 0.0, 1.0}};;
       double q_pose[6], q_sols[8][6];
       int count = 0;
