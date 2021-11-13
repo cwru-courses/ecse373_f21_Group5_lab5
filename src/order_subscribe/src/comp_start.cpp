@@ -304,7 +304,7 @@ while(first_model.size() > 0){
         joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
 	actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
 	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
-	ros::Duration(30.0).sleep();
+	ros::Duration(10.0).sleep();
 	continue;
       } 
       if(points.size() > 0){
@@ -317,7 +317,7 @@ while(first_model.size() > 0){
         joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
 	actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
 	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
-	ros::Duration(30.0).sleep();
+	ros::Duration(10.0).sleep();
         points.clear();
         first_model.pop_back();
         continue; 
@@ -361,7 +361,7 @@ while(first_model.size() > 0){
       joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
       actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
 	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
-	ros::Duration(30.0).sleep();
+	ros::Duration(10.0).sleep();
     }
     }
   }
