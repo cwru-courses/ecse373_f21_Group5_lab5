@@ -14,7 +14,9 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "geometry_msgs/TransformStamped.h"
-int failedtf = 0;
+#include "actionlib/client/simple_action_client.h"
+#include "actionlib/client/terminal_state.h"
+#include "control_msgs/FollowJointTrajectoryAction.h"
 sensor_msgs::JointState joint_states;
 std_srvs::Trigger begin_comp;
 int service_call_succeeded;
@@ -91,9 +93,9 @@ int main(int argc, char **argv)
   logic_quality_vector.resize(2);
   points.clear();
   tf2_ros::TransformListener tfListener(tfBuffer);
-  ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
 
-  ros::Publisher arm_command_pub = n.advertise<trajectory_msgs::JointTrajectory>("/ariac/arm1/arm/command", 10);
+  actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> trajectory_as("ariac/arm1/arm/follow_joint_trajectory", true);
+  ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
   
   ros::Subscriber sub = n.subscribe("/ariac/orders", 1000, chatterCallback);
 
@@ -110,7 +112,6 @@ int main(int argc, char **argv)
   ros::Subscriber joint_states_h = n.subscribe("ariac/arm1/joint_states", 10, jointCB);
 
   while(ros::ok() && !tfBuffer.canTransform("arm1_base_link", "logical_camera_bin4_frame", ros::Time(0,0), ros::Duration(4.0))){
-  failedtf++;
 }
   ros::ServiceClient request_bin = n.serviceClient<osrf_gear::GetMaterialLocations>("/ariac/material_locations");
   service_call_succeeded = begin_client.call(begin_comp);
@@ -136,7 +137,7 @@ int main(int argc, char **argv)
       geometry_msgs::TransformStamped tfStamped;
       geometry_msgs::TransformStamped tfActuator_Stamped;
       geometry_msgs::TransformStamped tfWorld_Stamped;
-      std::string bin_frame;
+      std::string camera_bin_frame, bin_frame;
       first_order = order_vector.front();
       first_shipment = first_order.shipments.front();
       first_product = first_shipment.products.front();
@@ -149,120 +150,50 @@ int main(int argc, char **argv)
         ROS_INFO("product type: %s is in  %s", first_product.type.c_str(), find_bins.response.storage_units.front().unit_id.c_str());
 	if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin1")){
  	  first_image = logic_camera_bin_vector[0];
-	  bin_frame = "logical_camera_bin1_frame";
-          try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin1_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_bin1_frame";
+	  bin_frame = "bin1_frame";
         }
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin2")){
 	  first_image = logic_camera_bin_vector[1];
-	  bin_frame = "logical_camera_bin2_frame";
-	 
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin2_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_bin2_frame";
+	  bin_frame = "bin2_frame";
         }
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin3")){
 	  first_image = logic_camera_bin_vector[2];
-	  bin_frame = "logical_camera_bin3_frame";
-	  
-          try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin3_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
-        }
+	  camera_bin_frame = "logical_camera_bin3_frame";
+	  bin_frame = "bin3_frame";
+	}  
         else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin4")){
 	  first_image = logic_camera_bin_vector[3];
-	  bin_frame = "logical_camera_bin4_frame";
-	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin4_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_bin4_frame";
+	  bin_frame = "bin4_frame";
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin5")){
 	  first_image = logic_camera_bin_vector[4];
-	  bin_frame = "logical_camera_bin5_frame";
-	  
-          try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin5_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_bin5_frame";
+	  bin_frame = "bin5_frame";
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin6")){
 	  first_image = logic_camera_bin_vector[5];
-	  bin_frame = "logical_camera_bin6_frame";
-	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_bin6_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_bin6_frame";
+	  bin_frame = "bin6_frame";
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv1")){
 	  first_image = logic_agv_vector[0];
-	  bin_frame = "logical_camera_agv1_frame";
-	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_agv1_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_agv1_frame";
+	  bin_frame = "agv1_frame";
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv2")){
 	  first_image = logic_agv_vector[1];
-	  bin_frame = "logical_camera_agv2_frame";
-	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "logical_camera_agv2_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
+	  camera_bin_frame = "logical_camera_agv2_frame";
+	  bin_frame = "agv2_frame";
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "quality_control_sensor_1")){
 	  first_image = logic_agv_vector[0];
-	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "quality_control_sensor_1_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
         }
 	else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "quality_control_sensor_2")){
 	  first_image = logic_agv_vector[1];
 	  
-	  try{
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", "quality_control_sensor_2_frame", ros::Time(0,0), ros::Duration(1.0));
-	  ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
-	  }
-	  catch (tf2::TransformException &ex){
-	    ROS_ERROR("%s", ex.what());
-	  }
         }
         for(int i = 0; i < first_image.models.size(); i++){
 	  if(!strcmp(first_image.models[i].type.c_str(), first_product.type.c_str())){
@@ -274,36 +205,53 @@ int main(int argc, char **argv)
       }
 while(first_model.size() > 0){
       double T_pose[4][4];
-      geometry_msgs::PoseStamped part_pose, image_pose, actuator_pose, waypoint, goal_pose;
-      image_pose.pose = first_image.pose;
+      geometry_msgs::PoseStamped part_pose, image_pose, bin_pose, actuator_pose, waypoint, goal_pose;
+      
       try{
         tfWorld_Stamped = tfBuffer.lookupTransform("arm1_base_link", "world", ros::Time(0,0), ros::Duration(1.0));
-	ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
+	ROS_DEBUG("Transform to [%s] from [%s]", tfWorld_Stamped.header.frame_id.c_str(), tfWorld_Stamped.child_frame_id.c_str());
       }
       catch (tf2::TransformException &ex){
 	ROS_ERROR("%s", ex.what());
       }
       try{
-	tfStamped = tfBuffer.lookupTransform("arm1_base_link", bin_frame, ros::Time(0,0), ros::Duration(1.0));
+	  tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", bin_frame, ros::Time(0,0), ros::Duration(1.0));
+	  ROS_DEBUG("Transform to [%s] from [%s]", tfActuator_Stamped.header.frame_id.c_str(), tfActuator_Stamped.child_frame_id.c_str());
+	  }
+	  catch (tf2::TransformException &ex){
+	    ROS_ERROR("%s", ex.what());
+	  }
+      try{
+	tfStamped = tfBuffer.lookupTransform("arm1_base_link", camera_bin_frame, ros::Time(0,0), ros::Duration(1.0));
 	ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
       }
       catch (tf2::TransformException &ex){
 	ROS_ERROR("%s", ex.what());
       }
-      tf2::doTransform(image_pose, actuator_pose, tfActuator_Stamped);
-    part_pose.pose = first_model.back().pose;
+      
+      image_pose.pose = first_image.pose;
+      part_pose.pose = first_model.back().pose;
+      bin_pose.pose.position.x = 0.0;
+      bin_pose.pose.position.y = 0.0;
+      bin_pose.pose.position.z = 0.0;
+      bin_pose.pose.orientation.x = 0.0;
+      bin_pose.pose.orientation.y = 0.0;
+      bin_pose.pose.orientation.z = 0.0;
+      bin_pose.pose.orientation.w = 0.0;
+      tf2::doTransform(bin_pose, actuator_pose, tfActuator_Stamped);
       tf2::doTransform(part_pose, goal_pose, tfStamped);
       tf2::doTransform(image_pose, waypoint, tfWorld_Stamped);
-      double T_way[4][4]= {{0.0, -1.0, 0.0, waypoint.pose.position.x + 0.3}, \
-      {0.0, 0.0, 1.0, waypoint.pose.position.y - 0.2}, \
+      double T_way[4][4]= {{0.0, -1.0, 0.0, waypoint.pose.position.x - 0.2}, \
+      {0.0, 0.0, 1.0, waypoint.pose.position.y + 0.2}, \
       {-1.0, 0.0, 0.0, waypoint.pose.position.z}, \
       {0.0, 0.0, 0.0, 1.0}};
       double T_des[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x}, \
       {0.0, 0.0, 1.0, goal_pose.pose.position.y}, \
-      {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.2}, \
+      {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.1}, \
       {0.0, 0.0, 0.0, 1.0}};
       double q_pose[6], q_way[8][6], q_sols[8][6];
       int count = 0;
+      int action_count = 0;
   //joint_states.position[1] is the linear_arm_actuator, not used in inverse calculation
       q_pose[0] = joint_states.position[2];
       q_pose[1] = joint_states.position[3];
@@ -317,10 +265,15 @@ while(first_model.size() > 0){
 
       int num_sols = ur_kinematics::inverse((double *)&T_des, (double *)&q_sols, 0.0);
       trajectory_msgs::JointTrajectory joint_trajectory;
+      control_msgs::FollowJointTrajectoryAction joint_trajectory_as;
 
       joint_trajectory.header.seq = count++;
       joint_trajectory.header.stamp = ros::Time::now();
       joint_trajectory.header.frame_id = "/base_link";
+
+      joint_trajectory_as.action_goal.header.seq = action_count++;
+      joint_trajectory_as.action_goal.header.stamp = ros::Time::now();
+      joint_trajectory_as.action_goal.header.frame_id = "/base_link";
 
       joint_trajectory.joint_names.clear();
  joint_trajectory.joint_names.push_back("linear_arm_actuator_joint");
@@ -331,7 +284,7 @@ while(first_model.size() > 0){
       joint_trajectory.joint_names.push_back("wrist_2_joint");
       joint_trajectory.joint_names.push_back("wrist_3_joint");
 
-      joint_trajectory.points.resize(2);
+      joint_trajectory.points.resize(3);
       joint_trajectory.points[0].positions.resize(joint_trajectory.joint_names.size());
       for(int indy = 0; indy < joint_trajectory.joint_names.size(); indy++){
         for(int indz = 0; indz < joint_states.name.size(); indz++) {
@@ -342,25 +295,29 @@ while(first_model.size() > 0){
         }
       }
       joint_trajectory.points[0].time_from_start = ros::Duration(0.0);
-      if(joint_states.position[1] > actuator_pose.pose.position.x + .1 || joint_states.position[1] < actuator_pose.pose.position.x - .1){
+      if(joint_states.position[1] > actuator_pose.pose.position.y + .5 || joint_states.position[1] < actuator_pose.pose.position.y + .3){
         joint_trajectory.points.resize(2);
 	joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
 	joint_trajectory.points[1] = joint_trajectory.points[0];
-	joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.x;
+	joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y + .4;
 	joint_trajectory.points[1].time_from_start = ros::Duration(1.0);
-        arm_command_pub.publish(joint_trajectory);
-        ros::Duration(5.0).sleep();
+        joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
+	actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
+	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
+	ros::Duration(30.0).sleep();
 	continue;
       } 
       if(points.size() > 0){
         joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
-        joint_trajectory.points[1] = points[0];
+        joint_trajectory.points[1] = points[1];
         joint_trajectory.points[1].time_from_start = ros::Duration(2.0);
-        /*joint_trajectory.points[2].positions.resize(joint_trajectory.joint_names.size());
+        joint_trajectory.points[2].positions.resize(joint_trajectory.joint_names.size());
         joint_trajectory.points[2] = points[0];
-        joint_trajectory.points[2].time_from_start = ros::Duration(4.0);*/ 
-        arm_command_pub.publish(joint_trajectory);
-        ros::Duration(10.0).sleep();
+        joint_trajectory.points[2].time_from_start = ros::Duration(4.0); 
+        joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
+	actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
+	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
+	ros::Duration(30.0).sleep();
         points.clear();
         first_model.pop_back();
         continue; 
@@ -372,41 +329,41 @@ while(first_model.size() > 0){
       int q_way_indx = 0;
       int q_sols_indx = 0;
       for(int i = 0; i < num_way; i++){
-         if(q_way[i][0] > -1.57 && q_way[i][0] < 1.57){
+         if(q_way[i][0] < 1.57){
 	   if(q_way[i][1] > 0 && q_way[i][1] < 1.57){
               q_way_indx = i;
               break;
 	   }
 	 }
       }
-      for(int i = 0; num_sols; i++){
+      /*for(int i = 0; num_sols; i++){
          if(q_sols[i][0] > -1.57 && q_sols[i][0] < 1.57){
 	   if(q_sols[i][1] > 0 && q_sols[i][1] < 1.57){
               q_sols_indx = i;
               break;
 	   }
 	 }
-      }
+      }*/
       joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
       joint_trajectory.points[1].positions[0] = joint_states.position[1];
       for (int indy = 0; indy< 6; indy++){
-        joint_trajectory.points[1].positions[indy + 1] = q_sols[q_way_indx][indy];
+        joint_trajectory.points[1].positions[indy + 1] = q_way[q_way_indx][indy];
       }
       points.push_back(joint_trajectory.points[1]);
       joint_trajectory.points[1].time_from_start = ros::Duration(2.0);
-      /*joint_trajectory.points[2].positions.resize(joint_trajectory.joint_names.size());
+      joint_trajectory.points[2].positions.resize(joint_trajectory.joint_names.size());
       joint_trajectory.points[2].positions[0] = joint_states.position[1];
       for (int indy = 0; indy< 6; indy++){
         joint_trajectory.points[2].positions[indy + 1] = q_sols[q_sols_indx][indy];
       }
       points.push_back(joint_trajectory.points[2]);
-      joint_trajectory.points[2].time_from_start = ros::Duration(4.0);*/
-      arm_command_pub.publish(joint_trajectory);
-      ros::Duration(10.0).sleep();
-     
+      joint_trajectory.points[2].time_from_start = ros::Duration(4.0);
+      joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
+      actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
+	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
+	ros::Duration(30.0).sleep();
     }
     }
-    points.clear();
   }
   ros::waitForShutdown();
   return 0;
