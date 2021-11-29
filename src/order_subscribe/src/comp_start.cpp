@@ -38,17 +38,6 @@ std::vector<osrf_gear::LogicalCameraImage> logic_agv_vector;
 std::vector<osrf_gear::LogicalCameraImage> logic_quality_vector;
 std::vector<trajectory_msgs::JointTrajectoryPoint> points;
 
-//ranges used to define acceptable solutions for every joint of the arm
-float JOINT_ANGLE_EPS = 0.01;
-double joint_num = 6;
-float joint_ranges[][2] = {{0.0, 2.0* M_PI}, \
-			   {M_PI, 2.0 * M_PI}, \
-			   {0.0, M_PI}, \
-			   {0.0, 2.0 * M_PI}, \
-                           {3.0 * M_PI_2 - JOINT_ANGLE_EPS, 3.0 * M_PI_2 + JOINT_ANGLE_EPS}, \
-                           {0.0, 2.0 * M_PI}, \
-};
-
 void chatterCallback(const osrf_gear::Order::ConstPtr& orders){
   order_vector.push_back(*orders);
 }
@@ -98,7 +87,6 @@ void vacStateCB(const osrf_gear::VacuumGripperState::ConstPtr& vac_msg){
   vac_state = *vac_msg;
 }
 int time_from_start (trajectory_msgs::JointTrajectory *trajectory){
-  int last_point = trajectory->points.size() - 1;
   double max_position_dif = 0;
   int max_position_dif_num;
   float current_dif = 0;
@@ -106,10 +94,10 @@ int time_from_start (trajectory_msgs::JointTrajectory *trajectory){
     return 0;
   }
   for(int j = 1; j < trajectory->points.size(); j++){
-    current_dif = 0;
-    max_position_dif = 0;
-    for (int i = 0; i < trajectory->points[last_point].positions.size(); i++){
-      current_dif = fabs(trajectory->points[last_point].positions[i] - trajectory->points[last_point-1].positions[i]);
+    double current_dif = 0;
+    double max_position_dif = 0;
+    for (int i = 0; i < trajectory->points[j].positions.size(); i++){
+      current_dif = fabs(trajectory->points[j].positions[i] - trajectory->points[j-1].positions[i]);
       if(current_dif > max_position_dif){
         max_position_dif = double(current_dif);
       }
@@ -118,7 +106,7 @@ int time_from_start (trajectory_msgs::JointTrajectory *trajectory){
         current_dif *= 1.7;
       }
       else{
-        current_dif *= 0.66;
+        current_dif *= .6;
       }
       if(current_dif > max_position_dif){
         max_position_dif = double(current_dif);
@@ -138,6 +126,23 @@ int set_empty(geometry_msgs::PoseStamped *set){
   set->pose.orientation.w = 0.0;
   return 0;
 }
+/*int select_sol(double *q_sols, int num_sols){
+  int q_sols_indx = 0;
+  for(int i = 0; i < num_sols; i++){
+    ROS_INFO("response %d : %f", i, (*(q_sols + i) + 1));
+    if((3*M_PI_2 < (*(q_sols + i) + 1)) && ((*(q_sols + i) + 1) < 2*M_PI)){
+      ROS_INFO("response %d : %f", i, (*(q_sols + i) + 4));
+      if((*(q_sols + i) + 4) > 3* M_PI_2 - 0.01 && (*(q_sols + i) + 4) < 3 * M_PI_2 + 0.01){
+	ROS_INFO("found");
+        q_sols_indx = i;
+        break;
+      }   
+    }
+  }
+  ROS_INFO("found %d", q_sols_indx);
+  (*(q_sols + q_sols_indx + 1)) = angles::normalize_angle((*(q_sols + q_sols_indx + 1)));
+  return q_sols_indx;
+}*/
 int engage_gripper(osrf_gear::VacuumGripperControl *grip_control, ros::ServiceClient *vacuum_client, int choice){
   bool holding = vac_state.attached;
   grip_control->request.enable = choice;
@@ -167,65 +172,6 @@ int engage_gripper(osrf_gear::VacuumGripperControl *grip_control, ros::ServiceCl
     }
   }
   return 0;
-}
-/*int find_solution (double *q_sols, int num_sol){
-  int possibilities[num_sol] = {0}; //initialize solution array to zero
-  int ret = 0; //the returning solution number
-  
-  for (int sol_indx = 0; sol_indx < num_sol; sol_indx++){
-    for (int joint_indx = 0; joint_indx < joint_num; joint_indx++) {
-      if((*(q_sols + (sol_indx + joint_num) + joint_indx) > (joint_ranges[joint_indx][0])) && (*(q_sols + (sol_indx + joint_num) + joint_indx) > (joint_ranges[joint_indx][1]))){
-	possibilities[sol_indx] += (1 << joint_indx);
-      }
-    }
-  }
-  for (int indx = 0; indx < num_sol; indx++){
-    if((possibilities[indx] & 0x17) == 0x17) {
-      ret = indx;
-      break;
-    }
-  }
-  return ret;
-}*/  
-int select_sol (double q_sols[8][6], int num_sol){
-  int q_way_indx = 0;
-  for(int i = 0; i < num_sol; i++){
-    if(q_sols[i][0] < 1.57){
-      if(q_sols[i][1] > 0 && q_sols[i][1] < 1.57){
-	if (q_sols[i][3] < 0){
-	  if(q_sols[i][4] = 1.57){
-            q_way_indx = i;
-            break;
-          }
-        }
-      }
-    }
-  }
-  return q_way_indx;
-}
-int waypoint_divider (trajectory_msgs::JointTrajectory *trajectory, geometry_msgs::PoseStamped waypoint, int side, std::vector<trajectory_msgs::JointTrajectoryPoint> *points){
-  double current_slice_x = 0;
-  double current_slice_y = 0;
-  double current_slice_z = 0;
-  int q_way_indx = 0;
-  double q_way[8][6];
-  for (int frac = 1; frac = 8; frac++){
-    current_slice_x += (waypoint.pose.position.x - 0.2)/8;
-    current_slice_y += (waypoint.pose.position.y + side)/8;
-    current_slice_z += (waypoint.pose.position.z)/8;
-    double T_way[4][4]= {{0.0, -1.0, 0.0, current_slice_x}, \
-      {0.0, 0.0, 1.0, current_slice_y}, \
-      {-1.0, 0.0, 0.0, current_slice_z}, \
-      {0.0, 0.0, 0.0, 1.0}};
-    int num_way = ur_kinematics::inverse((double *)&T_way, (double *)&q_way, 0.0);
-    q_way_indx = select_sol(q_way, num_way);
-    trajectory->points[frac].positions.resize(trajectory->joint_names.size());
-    trajectory->points[frac].positions[0] = joint_states.position[1];
-    for (int indy = 0; indy< 6; indy++){
-      trajectory->points[frac].positions[indy + 1] = q_way[q_way_indx][indy];
-    }
-    points->push_back(trajectory->points[frac]);
-  }
 }
 int main(int argc, char **argv)
   {
@@ -397,6 +343,10 @@ while(first_model.size() > 0){
       else{
         side = .2;
       }
+      double T_way[4][4]= {{0.0, -1.0, 0.0, waypoint.pose.position.x - 0.2}, \
+      {0.0, 0.0, 1.0, waypoint.pose.position.y + side}, \
+      {-1.0, 0.0, 0.0, waypoint.pose.position.z}, \
+      {0.0, 0.0, 0.0, 1.0}};
       double T_des[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x}, \
       {0.0, 0.0, 1.0, goal_pose.pose.position.y}, \
       {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.02}, \
@@ -405,6 +355,7 @@ while(first_model.size() > 0){
       int count = 0;
       int action_count = 0;
 
+      int num_way = ur_kinematics::inverse((double *)&T_way, (double *)&q_way, 0.0);
 
       int num_sols = ur_kinematics::inverse((double *)&T_des, (double *)&q_sols, 0.0);
       trajectory_msgs::JointTrajectory joint_trajectory;
@@ -427,7 +378,7 @@ while(first_model.size() > 0){
       joint_trajectory.joint_names.push_back("wrist_2_joint");
       joint_trajectory.joint_names.push_back("wrist_3_joint");
 
-      joint_trajectory.points.resize(10);
+      joint_trajectory.points.resize(3);
       joint_trajectory.points[0].positions.resize(joint_trajectory.joint_names.size());
       for(int indy = 0; indy < joint_trajectory.joint_names.size(); indy++){
         for(int indz = 0; indz < joint_states.name.size(); indz++) {
@@ -442,7 +393,7 @@ while(first_model.size() > 0){
         joint_trajectory.points.resize(2);
 	joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
 	joint_trajectory.points[1] = joint_trajectory.points[0];
-	if(goal_pose.pose.position.y > actuator_pose.pose.position.y){
+	if(part_pose.pose.position.y > 0.0){
 	  joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y + .6;
 	}
 	else{
@@ -463,8 +414,8 @@ while(first_model.size() > 0){
         time_from_start(&joint_trajectory);
         joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
 	actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
+	ros::Duration(2.0).sleep();
 	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
-	ros::Duration(10.0).sleep();
         points.clear();
 	if (vac_state.attached == 0){
           first_model.pop_back();
@@ -473,32 +424,50 @@ while(first_model.size() > 0){
         continue; 
       }
       points.push_back(joint_trajectory.points[0]);
-      waypoint_divider(&joint_trajectory, waypoint, side, &points);
-      int q_sols_indx = 0;
-	/*angles/angles.h*/
-  //will change to add limits to select the best solution
+     
+	
+      /*int q_way_indx = select_sol((double *)&q_way, num_way);*/
+      /*int q_sols_indx = select_sol((double *)&q_sols, num_sols);*/
+  //not using function because pointer has issues
+  int q_way_indx = 0;
+  int q_sols_indx = 0;
+  for(int i = 0; i < num_sols; i++){
+    if(3*M_PI_2 < q_way[i][1] && q_way[i][1] < 2*M_PI){
+      if(q_way[i][4] > M_PI_2 - 0.01 && q_way[i][4] < M_PI_2 + 0.01){
+        q_way_indx = i;
+        break;
+      }   
+    }
+  }
+  q_way[q_way_indx][1] = angles::normalize_angle(q_way[q_way_indx][1]); 
+  for(int i = 0; i < num_sols; i++){
+    if(3*M_PI_2 < q_sols[i][1] && q_sols[i][1] < 2*M_PI){
+      if(q_sols[i][4] > M_PI_2 - 0.01 && q_sols[i][4] < M_PI_2 + 0.01){
+        q_sols_indx = i;
+        break;
+      }   
+    }
+  }
+  q_sols[q_sols_indx][1] = angles::normalize_angle(q_sols[q_sols_indx][1]); 
       
-      /*for(int i = 0; num_sols; i++){
-         if(q_sols[i][0] > -1.57 && q_sols[i][0] < 1.57){
-	   if(q_sols[i][1] > 0 && q_sols[i][1] < 1.57){
-              q_sols_indx = i;
-              break;
-	   }
-	 }
-      }*/
-      ros::Duration(5.0).sleep();
-      joint_trajectory.points[10].positions.resize(joint_trajectory.joint_names.size());
-      joint_trajectory.points[10].positions[0] = joint_states.position[1];
+      joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
+      joint_trajectory.points[1].positions[0] = joint_states.position[1];
       for (int indy = 0; indy< 6; indy++){
-        joint_trajectory.points[10].positions[indy + 1] = q_sols[q_sols_indx][indy];
+        joint_trajectory.points[1].positions[indy + 1] = q_way[q_way_indx][indy];
       }
-      points.push_back(joint_trajectory.points[10]);
+      points.push_back(joint_trajectory.points[1]);
+      joint_trajectory.points[2].positions.resize(joint_trajectory.joint_names.size());
+      joint_trajectory.points[2].positions[0] = joint_states.position[1];
+      for (int indy = 0; indy< 6; indy++){
+        joint_trajectory.points[2].positions[indy + 1] = q_sols[q_sols_indx][indy];
+      }
+      points.push_back(joint_trajectory.points[2]);
       time_from_start(&joint_trajectory);
       joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
       actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
+        ros::Duration(2.0).sleep();
 	ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
 	last_desired = part_pose;
-        ros::Duration(5.0).sleep();
 	if(vac_state.attached == 0){
 	  vac_grip_succeeded = engage_gripper(&grip_control, &vacuum_client, 1);
         }
