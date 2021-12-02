@@ -9,6 +9,7 @@
 #include "osrf_gear/LogicalCameraImage.h"
 #include "osrf_gear/VacuumGripperControl.h"
 #include "osrf_gear/VacuumGripperState.h"
+#include "osrf_gear/AGVControl.h"
 #include "ur_kinematics/ur_kin.h"
 #include "ros/ros.h"
 #include "angles/angles.h"
@@ -22,8 +23,9 @@
 #include "control_msgs/FollowJointTrajectoryAction.h"
 sensor_msgs::JointState joint_states;
 std_srvs::Trigger begin_comp;
+osrf_gear::AGVControl notify_agv;
 osrf_gear::VacuumGripperControl grip_control;
-int service_call_succeeded, vac_grip_succeeded;
+int service_call_succeeded, vac_grip_succeeded, agv_success;
 tf2_ros::Buffer tfBuffer;
 osrf_gear::LogicalCameraImage first_image;
 osrf_gear::GetMaterialLocations find_bins;
@@ -191,6 +193,11 @@ int main(int argc, char **argv)
   ros::ServiceClient begin_client = n.serviceClient<std_srvs::Trigger>("/ariac/start_competition");
   
   ros::ServiceClient vacuum_client = n.serviceClient<osrf_gear::VacuumGripperControl>("/ariac/arm1/gripper/control");
+
+  ros::ServiceClient agv1_client = n.serviceClient<osrf_gear::AGVControl>("/ariac/agv1");
+
+  ros::ServiceClient agv2_client = n.serviceClient<osrf_gear::AGVControl>("/ariac/agv2");
+
   ros::Subscriber sub = n.subscribe("/ariac/orders", 1000, chatterCallback);
 
   ros::Subscriber logical_camera_subscriber_agv1 = n.subscribe("/ariac/logical_camera_agv1", 10, logicagv1CameraCallback);
@@ -228,6 +235,7 @@ int main(int argc, char **argv)
        }
   ros::AsyncSpinner spinner(1);
   spinner.start();
+  int agv_tray = 1;
   while(ros::ok()){
     if(order_vector.size() > 0){
       geometry_msgs::TransformStamped tfStamped;
@@ -236,13 +244,24 @@ int main(int argc, char **argv)
       std::string camera_bin_frame, bin_frame, tray_frame, agv_camera_frame;
       current_order = order_vector.back();
       geometry_msgs::PoseStamped last_desired;
-      int agv_tray = 2;
       set_empty(&last_desired);
       ros::Duration(1.0).sleep();
       while(current_order.shipments.size() > 0){
         current_shipment = current_order.shipments.back();
-        agv_camera_frame = "logical_camera_agv2_frame";
-        tray_frame = "kit_tray_2";
+	if (!strcmp(current_shipment.agv_id.c_str(), "agv1")){
+	  agv_tray = 1;
+        }
+        else if (!strcmp(current_shipment.agv_id.c_str(), "agv2")){
+          agv_tray = 2;
+        }
+        if (agv_tray == 1){
+          agv_camera_frame = "logical_camera_agv1_frame";
+          tray_frame = "kit_tray_1";
+        }
+        else{
+          agv_camera_frame = "logical_camera_agv2_frame";
+          tray_frame = "kit_tray_2";
+        }
         while(current_shipment.products.size() > 0){
           current_product = current_shipment.products.back();
           find_bins.request.material_type = current_product.type;
@@ -558,9 +577,28 @@ int main(int argc, char **argv)
             }
           }
         }
+        if (agv_tray == 1){
+          notify_agv.request.shipment_type = current_shipment.shipment_type;
+          service_call_succeeded = agv1_client.call(notify_agv);
+          if (service_call_succeeded == 0){
+            ROS_ERROR("Gripper failed to engage!");
+            ros::shutdown();
+          }
+          agv_tray = 2;
+        }
+        else{
+          notify_agv.request.shipment_type = current_shipment.shipment_type;
+          service_call_succeeded = agv1_client.call(notify_agv);
+          if (service_call_succeeded == 0){
+            ROS_ERROR("Gripper failed to engage!");
+            ros::shutdown();
+          }
+          agv_tray = 1;
+        }
         current_order.shipments.pop_back();
+        ros::Duration(15.0).sleep();
       }
-      order_vector.pop_back();
+      
     }
   }
       
