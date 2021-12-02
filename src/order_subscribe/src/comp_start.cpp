@@ -32,8 +32,6 @@ osrf_gear::Shipment current_shipment;
 osrf_gear::Product current_product;
 osrf_gear::VacuumGripperState vac_state;
 std::vector<geometry_msgs::Pose> current_product_pose;
-std::vector<std::string> camera_bin_frame;
-std::vector<std::string> bin_frame;
 std::vector<osrf_gear::Order> order_vector;
 std::vector<osrf_gear::LogicalCameraImage> logic_camera_bin_vector;
 std::vector<osrf_gear::LogicalCameraImage> logic_agv_vector;
@@ -180,10 +178,6 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
   order_vector.clear();
   current_product_pose.clear();
-  camera_bin_frame.clear();
-  camera_bin_frame.resize(2);
-  bin_frame.clear();
-  bin_frame.resize(2);
   logic_camera_bin_vector.clear();
   logic_camera_bin_vector.resize(6);
   logic_agv_vector.clear();
@@ -239,13 +233,16 @@ int main(int argc, char **argv)
       geometry_msgs::TransformStamped tfStamped;
       geometry_msgs::TransformStamped tfActuator_Stamped;
       geometry_msgs::TransformStamped tfWorld_Stamped;
-      std::string c_camera_bin_frame, c_bin_frame;
+      std::string camera_bin_frame, bin_frame, tray_frame, agv_camera_frame;
       current_order = order_vector.back();
       geometry_msgs::PoseStamped last_desired;
+      int agv_tray = 2;
       set_empty(&last_desired);
       ros::Duration(1.0).sleep();
       while(current_order.shipments.size() > 0){
         current_shipment = current_order.shipments.back();
+        agv_camera_frame = "logical_camera_agv2_frame";
+        tray_frame = "kit_tray_2";
         while(current_shipment.products.size() > 0){
           current_product = current_shipment.products.back();
           find_bins.request.material_type = current_product.type;
@@ -254,48 +251,46 @@ int main(int argc, char **argv)
             ROS_ERROR("product does not exist or no orders in play");
           }
           else{
-	    camera_bin_frame.push_back("logical_camera_agv1_frame");
-	    bin_frame.push_back("kit_tray_1");
             ROS_INFO("product type: %s is in  %s", current_product.type.c_str(), find_bins.response.storage_units.front().unit_id.c_str());
 	    if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin1")){
  	      first_image = logic_camera_bin_vector[0];
-	      camera_bin_frame.push_back("logical_camera_bin1_frame");
-	      bin_frame.push_back("bin1_frame");
+	      camera_bin_frame = "logical_camera_bin1_frame";
+	      bin_frame = "bin1_frame";
             }
             else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin2")){
 	      first_image = logic_camera_bin_vector[1];
-	      camera_bin_frame.push_back("logical_camera_bin2_frame");
-	      bin_frame.push_back("bin2_frame");
+	      camera_bin_frame = "logical_camera_bin2_frame";
+	      bin_frame = "bin2_frame";
             }
             else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin3")){
 	      first_image = logic_camera_bin_vector[2];
-	      camera_bin_frame.push_back("logical_camera_bin3_frame");
-	      bin_frame.push_back("bin3_frame");
+	      camera_bin_frame = "logical_camera_bin3_frame";
+	      bin_frame = "bin3_frame";
 	    }  
             else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin4")){
 	      first_image = logic_camera_bin_vector[3];
-	      camera_bin_frame.push_back("logical_camera_bin4_frame");
-	      bin_frame.push_back("bin4_frame");
+	      camera_bin_frame = "logical_camera_bin4_frame";
+	      bin_frame = "bin4_frame";
             }
 	    else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin5")){
 	      first_image = logic_camera_bin_vector[4];
-	      camera_bin_frame.push_back("logical_camera_bin5_frame");
-	      bin_frame.push_back("bin5_frame");
+	      camera_bin_frame = "logical_camera_bin5_frame";
+	      bin_frame = "bin5_frame";
             }
 	    else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "bin6")){
 	      first_image = logic_camera_bin_vector[5];
-	      camera_bin_frame.push_back("logical_camera_bin6_frame");
-	      bin_frame.push_back("bin6_frame");
+	      camera_bin_frame = "logical_camera_bin6_frame";
+	      bin_frame = "bin6_frame";
             }
 	    else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv1")){
 	      first_image = logic_agv_vector[0];
-	      camera_bin_frame.push_back("logical_camera_agv1_frame");
-	      bin_frame.push_back("agv1_frame");
+	      camera_bin_frame = "logical_camera_agv1_frame";
+	      bin_frame = "agv1_frame";
             }
 	    else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "agv2")){
 	      first_image = logic_agv_vector[1];
-	      camera_bin_frame.push_back("logical_camera_agv2_frame");
-	      bin_frame.push_back("agv2_frame");
+	      camera_bin_frame = "logical_camera_agv2_frame";
+	      bin_frame = "agv2_frame";
             }
 	    else if(!strcmp(find_bins.response.storage_units.front().unit_id.c_str(), "quality_control_sensor_1")){
 	      first_image = logic_agv_vector[0];
@@ -313,15 +308,17 @@ int main(int argc, char **argv)
               }
             }
           }
+          int check_linear = 1;
           while(current_product_pose.size() > 0){ //only ever reaches one but allows for looping
 	    ROS_INFO("here %d", current_product_pose.size());
             double T_pose[4][4];
 	    int agv = 0;
+            int num_way = 0;
             geometry_msgs::PoseStamped part_pose, bin_pose, actuator_pose, goal_pose;
 	    ROS_INFO("%d , %d", vac_state.attached, points.size());
-            c_camera_bin_frame = camera_bin_frame.back();
-	    c_bin_frame = bin_frame.back();
 	    if(vac_state.attached == 1 && points.size() == 0){
+                camera_bin_frame = tray_frame;
+	        bin_frame = agv_camera_frame;
 		part_pose.pose = current_product.pose;
 	        agv = 1;
             }
@@ -329,10 +326,10 @@ int main(int argc, char **argv)
               part_pose.pose = current_product_pose.back();
             }
             ROS_INFO("%d", agv);
-	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", c_bin_frame, ros::Time(0,0), ros::Duration(1.0));
+	    tfActuator_Stamped = tfBuffer.lookupTransform("arm1_linear_arm_actuator", bin_frame, ros::Time(0,0), ros::Duration(1.0));
 	      ROS_DEBUG("Transform to [%s] from [%s]", tfActuator_Stamped.header.frame_id.c_str(), tfActuator_Stamped.child_frame_id.c_str());
 	    
-	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", c_camera_bin_frame, ros::Time(0,0), ros::Duration(1.0));
+	    tfStamped = tfBuffer.lookupTransform("arm1_base_link", camera_bin_frame, ros::Time(0,0), ros::Duration(1.0));
 	      ROS_DEBUG("Transform to [%s] from [%s]", tfStamped.header.frame_id.c_str(), tfStamped.child_frame_id.c_str());
             
       
@@ -342,34 +339,44 @@ int main(int argc, char **argv)
             double side = 0;
             if(part_pose.pose.position.y > bin_pose.pose.position.y){
               side = .2;
+              if(agv == 1 && agv_tray == 2){
+                side *= -1;
+              }
             }
             else{
               side = -.2;
+              if(agv == 1 && agv_tray == 2){
+                side *= -1;
+              }
             }
-	    double T_way[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x -0.1}, \
+	    double T_way[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x}, \
             {0.0, 0.0, 1.0, goal_pose.pose.position.y + side}, \
             {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.5}, \
             {0.0, 0.0, 0.0, 1.0}};
-	    if(agv == 1){
-              if(part_pose.pose.position.x > bin_pose.pose.position.x){
-                side = .2;
-              }
-              else{
-                side = -.2;
-              }
-              T_way[1][4] = goal_pose.pose.position.x + side;
-	      T_way[2][4] = goal_pose.pose.position.y - 0.1;
-	    }
+            double T_agv1[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x + side}, \
+            {0.0, 0.0, 1.0, goal_pose.pose.position.y - 0.3}, \
+            {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.3}, \
+            {0.0, 0.0, 0.0, 1.0}};
+            double T_agv2[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x + side}, \
+            {0.0, 0.0, 1.0, goal_pose.pose.position.y + 0.3}, \
+            {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.3}, \
+            {0.0, 0.0, 0.0, 1.0}};
             double T_des[4][4] = {{0.0, -1.0, 0.0, goal_pose.pose.position.x}, \
             {0.0, 0.0, 1.0, goal_pose.pose.position.y}, \
-            {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.02}, \
+            {-1.0, 0.0, 0.0, goal_pose.pose.position.z + 0.019}, \
             {0.0, 0.0, 0.0, 1.0}};
             double q_pose[6], q_way[8][6], q_sols[8][6];
             int count = 0;
             int action_count = 0;
-
-            int num_way = ur_kinematics::inverse((double *)&T_way, (double *)&q_way, 0.0);
-
+            if (agv == 1 && agv_tray == 1){
+              num_way = ur_kinematics::inverse((double *)&T_agv1, (double *)&q_way, 0.0);
+	    }
+            else if (agv == 1 && agv_tray == 2){
+              num_way = ur_kinematics::inverse((double *)&T_agv2, (double *)&q_way, 0.0);
+	    }
+	    else{
+              num_way = ur_kinematics::inverse((double *)&T_way, (double *)&q_way, 0.0);
+            }
             int num_sols = ur_kinematics::inverse((double *)&T_des, (double *)&q_sols, 0.0);
             trajectory_msgs::JointTrajectory joint_trajectory;
             control_msgs::FollowJointTrajectoryAction joint_trajectory_as;
@@ -390,7 +397,6 @@ int main(int argc, char **argv)
             joint_trajectory.joint_names.push_back("wrist_1_joint");
             joint_trajectory.joint_names.push_back("wrist_2_joint");
             joint_trajectory.joint_names.push_back("wrist_3_joint");
-
             joint_trajectory.points.resize(3);
             joint_trajectory.points[0].positions.resize(joint_trajectory.joint_names.size());
             for(int indy = 0; indy < joint_trajectory.joint_names.size(); indy++){
@@ -402,39 +408,40 @@ int main(int argc, char **argv)
               }
             }
             joint_trajectory.points[0].time_from_start = ros::Duration(0.0);
-            if(part_pose.pose.position.y > last_desired.pose.position.y + .1 || part_pose.pose.position.y < last_desired.pose.position.y - .1){
+            if(check_linear == 1){
+              bool side;
               joint_trajectory.points.resize(2);
 	      joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
      	      joint_trajectory.points[1] = joint_trajectory.points[0];
 	      if(part_pose.pose.position.y > 0.0){
 		ROS_INFO("%f", actuator_pose.pose.position.y);
-		if((actuator_pose.pose.position.y + .6) > 2 && agv == 0){
-                  ROS_INFO("%f", actuator_pose.pose.position.y);
-                  joint_trajectory.points[1].positions[0] = 2.3;
-	        }
-                else if ((actuator_pose.pose.position.y + .6) > 2 && agv == 1){
-		  joint_trajectory.points[1].positions[0] = 2.3;
-		}
-		else{
-	          joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y + .5;
-		}
-	      }
+                joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y + .5;
+                side = 0;
+              }
 	      else{
-                if((actuator_pose.pose.position.y + .6) < -2 && agv == 0){
-                  ROS_INFO("%f", actuator_pose.pose.position.y);
-                  joint_trajectory.points[1].positions[0] = -1.7;
-	        }
-                else if ((actuator_pose.pose.position.y + .6) < -2 && agv == 1){
-		  joint_trajectory.points[1].positions[0] = -2.3;
-		}
-	        joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y - .5;
+                joint_trajectory.points[1].positions[0] = actuator_pose.pose.position.y - .5;
+                side = 1;
 	      }
+	      if(side = 0 &&(actuator_pose.pose.position.y +.5) > 2 && agv == 0){
+                 joint_trajectory.points[1].positions[0] = 2.56;
+	      }
+              else if ((actuator_pose.pose.position.y + .5) > 2 && agv == 1){
+		joint_trajectory.points[1].positions[0] = 2.3;
+              }
+              if(side = 1 &&(actuator_pose.pose.position.y - .5) < -2 && agv == 0){
+                ROS_INFO("%f", actuator_pose.pose.position.y);
+                joint_trajectory.points[1].positions[0] = -2.5;
+	      }
+              else if ((actuator_pose.pose.position.y - .5) < -2 && agv == 1){
+		joint_trajectory.points[1].positions[0] = -2.3;
+              }
+              
 	      time_from_start(&joint_trajectory);
               joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
 	      actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
 	      ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
+              check_linear = 0;
               ros::Duration(5.0).sleep();
-              last_desired = part_pose;
 	      continue;
             } 
             if(points.size() > 0){
@@ -447,15 +454,12 @@ int main(int argc, char **argv)
               joint_trajectory_as.action_goal.goal.trajectory = joint_trajectory;
 	      actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
 	      ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
-	      ros::Duration(5.0).sleep();
-              camera_bin_frame.pop_back();
-	      bin_frame.pop_back();
+	      ros::Duration(10.0).sleep();
 	      if (vac_state.attached == 0){
                 current_product_pose.pop_back();
                 current_shipment.products.pop_back();
 	      }
-	      ROS_INFO("here %d", camera_bin_frame.size());
-	      last_desired = part_pose;
+              check_linear = 1;
               points.clear();
               continue; 
             }
@@ -485,7 +489,7 @@ int main(int argc, char **argv)
               }
             }
             q_sols[q_sols_indx][1] = angles::normalize_angle(q_sols[q_sols_indx][1]); 
-      
+            
             joint_trajectory.points[1].positions.resize(joint_trajectory.joint_names.size());
             joint_trajectory.points[1].positions[0] = joint_states.position[1];
             for (int indy = 0; indy< 6; indy++){
@@ -503,7 +507,6 @@ int main(int argc, char **argv)
             actionlib::SimpleClientGoalState state = trajectory_as.sendGoalAndWait(joint_trajectory_as.action_goal.goal, ros::Duration(30.0), ros::Duration(30.0));
    	    ROS_INFO("action Server returned with status: [%i] %s", state.state_, state.toString().c_str());
 	    ros::Duration(5.0).sleep();
-	    last_desired = part_pose;
 	    if(vac_state.attached == 0){
 	      bool holding = vac_state.attached;
               grip_control.request.enable = 1;
@@ -516,11 +519,14 @@ int main(int argc, char **argv)
                 if(grip_control.response.success){
                   ros::Time start_wait = ros::Time::now();
               //gross code, update later
-                  while(ros::Time::now().toSec() - start_wait.toSec() < 3){
-		    if(!(vac_state.attached == holding)){
-	              ROS_INFO("grip succeeded: %d %d", vac_state.attached, holding);
+                  while(ros::Time::now().toSec() - start_wait.toSec() < 5){
+		    if(vac_state.attached == 1){
 	              break;
                     }
+                  }
+                  if(vac_state.attached == 0){
+                    grip_control.request.enable = 0;
+                    service_call_succeeded = vacuum_client.call(grip_control);
                   }
                 } 
                 else{
@@ -529,7 +535,6 @@ int main(int argc, char **argv)
               }
 	    }
             else{
-              bool holding = vac_state.attached;
               grip_control.request.enable = 0;
               service_call_succeeded = vacuum_client.call(grip_control);
               if (service_call_succeeded == 0){
@@ -541,8 +546,7 @@ int main(int argc, char **argv)
                   ros::Time start_wait = ros::Time::now();
               //gross code, update later
                   while(ros::Time::now().toSec() - start_wait.toSec() < 3){
-		    if(!(vac_state.attached == holding)){
-	              ROS_INFO("grip succeeded: %d %d", vac_state.attached, holding);
+		    if(vac_state.attached == 0){
 	              break;
                     }
                   }  
